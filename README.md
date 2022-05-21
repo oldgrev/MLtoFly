@@ -6,14 +6,16 @@
 
 
 DCS World output via export.lua => python => pyvjoy => vjoy => DCS World Input
-                                => telemetry file to csv
-                                => periodic model + tf logs
+
+DCS World output via export.lua => python => telemetry file to csv
+
+DCS World output via export.lua => python=> stable baselines3 => file output of model + logs
 
 
 
 
 
 
-v1 training run tensorboard:
+prevoious v1 training run tensorboard:
 
 ![](/images/v1run.png)
