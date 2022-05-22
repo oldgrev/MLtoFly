@@ -323,7 +323,8 @@ class flyEnv(gym.Env):
         #badmove
         if(self.badmove):
             self.reward = float(-1000)
-            done = True                        
+            done = True
+            self.done = True                        
             self.reward = self.altRad * self.actiondeltacoefficient * self.speedcoefficient
             self.totalreward = self.totalreward + self.reward
             print("")
