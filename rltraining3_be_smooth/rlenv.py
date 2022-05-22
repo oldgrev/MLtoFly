@@ -3,6 +3,7 @@ from gym import spaces
 import pandas as pd
 import numpy as np
 from global_hotkeys import *
+import random
 
 from torch import t
 #from learnv1.learninglogger import UDPServerSocket
@@ -42,7 +43,9 @@ class flyEnv(gym.Env):
         start_checking_hotkeys()
         self.cycles = 0
         self.lifetimesteps = 1000
+        self.lifetimesteps = 100
         self.maxRadalt = 0
+        self.totalreward = 0
         self.steps = 0
         self.localIP     = "127.0.0.1"
         self.localPort   = 54585
@@ -208,13 +211,13 @@ class flyEnv(gym.Env):
                 key = Key.esc
                 keyboard.press(key)
                 keyboard.release(key)
-                time.sleep(1)
+                #time.sleep(1)
                 mouse.move(969, 697, absolute=True, duration=0.2)
                 mouse.click('left')
-                time.sleep(2)
+                #time.sleep(2)
                 mouse.move(1524, 931, absolute=True, duration=0.2)
                 mouse.click('left')
-                time.sleep(10)
+                #time.sleep(10)
                 mouse.move(1514, 930, absolute=True, duration=0.2)
                 mouse.click('left')
 
@@ -232,13 +235,13 @@ class flyEnv(gym.Env):
             except:
                 pass
         self.UDPServerSocket.setblocking(1)
-        print("Step", self.steps)   
+        print(".",end = '')
         self.badmove = False   
         message = bytesAddressPair[0]
         logline = (message.decode() + "," + "{:f}".format(action[0]) + "," + "{:f}".format(action[1]) + "," + "{:f}".format(action[2]) + "," + "{:f}".format(action[3]) + "\n")
         self.telemetryfile.write(logline)
         self.flushcounter =+ 1
-        if(self.flushcounter > 1000):
+        if(self.flushcounter > 10):
             self.telemetryfile.flush()
             self.flushcounter = 0        
         self.prev_actions.append(action)
@@ -265,6 +268,8 @@ class flyEnv(gym.Env):
             done = False
             self.reward = float(1)
             print("First step return")
+            
+            self.totalreward = self.totalreward + self.reward
             return observation, self.reward, done, info
         self.lastmessagearray = self.messagearray
         self.lastt, self.lastyaw, self.lastpitch, self.lastroll, self.lastspeedx, self.lastspeedy, self.lastspeedz, self.lastaltBar, self.lastaltRad, self.lastegt, self.lastmyloclat, self.lastmyloclon = self.t, self.yaw, self.pitch, self.roll, self.speedx, self.speedy, self.speedz, self.altBar, self.altRad, self.egt, self.myloclat, self.myloclon
@@ -298,6 +303,7 @@ class flyEnv(gym.Env):
             done = False
             self.reward = float(1)
             print("bad delta return")
+            self.totalreward = self.totalreward + self.reward
             return observation, self.reward, done, info
         self.yawdelta = (self.yaw - self.lastyaw) / self.tdelta
         self.pitchdelta = (self.pitch - self.lastpitch) / self.tdelta
@@ -317,8 +323,34 @@ class flyEnv(gym.Env):
         #badmove
         if(self.badmove):
             self.reward = float(-1000)
-            done = True
-            print("bad move return")
+            done = True                        
+            self.reward = self.altRad * self.actiondeltacoefficient * self.speedcoefficient
+            self.totalreward = self.totalreward + self.reward
+            print("")
+            print("bad move return", self.totalreward, self.maxRadalt)
+            time.sleep(1)
+            keyboard = Controller()
+            key = Key.esc
+            keyboard.press(key)
+            keyboard.release(key)
+            self.UDPServerSocket.setblocking(0)
+            try:
+                while self.UDPServerSocket.recvfrom(self.bufferSize): pass
+            except:
+                pass
+            self.UDPServerSocket.setblocking(1)
+            mouse.move(969, 697, absolute=True, duration=0.2)
+            mouse.click('left')
+            #time.sleep(2)
+            mouse.move(1524, 931, absolute=True, duration=0.2)
+            mouse.click('left')
+            #time.sleep(10)
+            mouse.move(1514, 930, absolute=True, duration=0.2)
+            mouse.click('left')
+
+            self.telemetryfile.close()
+            currentDT = datetime.datetime.now()
+            os.rename(".\\telemetry\\current.csv",".\\telemetry\\" + currentDT.strftime('%Y%m%d%H%M%S') + ".csv")
             return observation, self.reward, self.done, info
         if(self.altRad > 5):
             self.resettime = time.time()
@@ -328,14 +360,21 @@ class flyEnv(gym.Env):
             #print("resetting groundedtime")
         grounded = False
         groundedtime = time.time() - self.resettime
-        print("groundedtime: " + str(groundedtime))
+        #print("groundedtime: " + str(groundedtime))
         if(groundedtime > 20):
             grounded = True
         if(grounded or self.supercrash):
             self.done = True
             done = True
-            print("grounded for too long, end of run")
-            self.reward = -1000 + self.t
+            #print("grounded for too long, end of run")
+            #self.reward = -1000 + self.t            
+            self.reward = self.altRad * self.actiondeltacoefficient * self.speedcoefficient
+            if(abs(self.pitch) > 2 or abs(self.roll) > 2):
+                self.reward = -1                        
+            self.reward = self.altRad * self.actiondeltacoefficient * self.speedcoefficient
+            self.totalreward = self.totalreward + self.reward
+            print("")
+            print("grounded return", self.totalreward, self.maxRadalt)
             time.sleep(1)
             keyboard = Controller()
             key = Key.esc
@@ -349,25 +388,28 @@ class flyEnv(gym.Env):
             self.UDPServerSocket.setblocking(1)
             mouse.move(969, 697, absolute=True, duration=0.2)
             mouse.click('left')
-            time.sleep(2)
+            #time.sleep(2)
             mouse.move(1524, 931, absolute=True, duration=0.2)
             mouse.click('left')
-            time.sleep(10)
+            #time.sleep(10)
             mouse.move(1514, 930, absolute=True, duration=0.2)
             mouse.click('left')
-            self.reward = self.altRad * self.actiondeltacoefficient * self.speedcoefficient
-            if(abs(self.pitch) > 2 or abs(self.roll) > 2):
-                self.reward = -1
+
             self.telemetryfile.close()
             currentDT = datetime.datetime.now()
             os.rename(".\\telemetry\\current.csv",".\\telemetry\\" + currentDT.strftime('%Y%m%d%H%M%S') + ".csv")
-            print(self.reward,message.decode(),"{:f}".format(((action[0] * 32767) + 32767) / 2) , "{:f}".format(((action[2] * 32767) + 32767) / 2) , "{:f}".format(((action[2] * 32767) + 32767) / 2), "{:f}".format(((action[3] * 32767) + 32767) / 2))
-            
-            print("grounded return")
+            #print(self.reward,message.decode(),"{:f}".format(((action[0] * 32767) + 32767) / 2) , "{:f}".format(((action[2] * 32767) + 32767) / 2) , "{:f}".format(((action[2] * 32767) + 32767) / 2), "{:f}".format(((action[3] * 32767) + 32767) / 2))
+
             return observation, self.reward, self.done, info
         if(self.success):
             self.done = True
             done = True
+            self.reward = self.altRad * self.actiondeltacoefficient * self.speedcoefficient
+            if(abs(self.pitch) > 2 or abs(self.roll) > 2):
+                self.reward = -1
+            self.totalreward = self.totalreward + self.reward
+            print("")
+            print("success return", self.totalreward, self.maxRadalt)
             keyboard = Controller()
             key = Key.esc
             keyboard.press(key)
@@ -381,20 +423,17 @@ class flyEnv(gym.Env):
             self.UDPServerSocket.setblocking(1)
             mouse.move(969, 697, absolute=True, duration=0.2)
             mouse.click('left')
-            time.sleep(2)
+            #time.sleep(2)
             mouse.move(1524, 931, absolute=True, duration=0.2)
             mouse.click('left')
-            time.sleep(10)
+            #time.sleep(10)
             mouse.move(1514, 930, absolute=True, duration=0.2)
             mouse.click('left')            
-            self.reward = self.altRad * self.actiondeltacoefficient * self.speedcoefficient
-            if(abs(self.pitch) > 2 or abs(self.roll) > 2):
-                self.reward = -1
             self.telemetryfile.close()
             currentDT = datetime.datetime.now()
             os.rename(".\\telemetry\\current.csv",".\\telemetry\\" + currentDT.strftime('%Y%m%d%H%M%S') + ".csv")
-            print(self.reward,message.decode(),"{:f}".format(((action[0] * 32767) + 32767) / 2) , "{:f}".format(((action[2] * 32767) + 32767) / 2) , "{:f}".format(((action[2] * 32767) + 32767) / 2), "{:f}".format(((action[3] * 32767) + 32767) / 2))
-            print("success return")
+            #print(self.reward,message.decode(),"{:f}".format(((action[0] * 32767) + 32767) / 2) , "{:f}".format(((action[2] * 32767) + 32767) / 2) , "{:f}".format(((action[2] * 32767) + 32767) / 2), "{:f}".format(((action[3] * 32767) + 32767) / 2))
+
             return observation, self.reward, self.done, info
         self.cycles += 1            
         self.UDPServerSocket.setblocking(0)
@@ -407,10 +446,11 @@ class flyEnv(gym.Env):
         reward = self.reward
         if(abs(self.pitch) > 2 or abs(self.roll) > 2):
             self.reward = -1
-        print(self.reward,message.decode(),"{:f}".format(((action[0] * 32767) + 32767) / 2) , "{:f}".format(((action[2] * 32767) + 32767) / 2) , "{:f}".format(((action[2] * 32767) + 32767) / 2), "{:f}".format(((action[3] * 32767) + 32767) / 2))
-        print("normal return")
-        print(self.observation_space.contains(observation))
-        print(observation)
+        #print(self.reward,message.decode(),"{:f}".format(((action[0] * 32767) + 32767) / 2) , "{:f}".format(((action[2] * 32767) + 32767) / 2) , "{:f}".format(((action[2] * 32767) + 32767) / 2), "{:f}".format(((action[3] * 32767) + 32767) / 2))
+        #print("normal return")
+        #print(self.observation_space.contains(observation))
+        #print(observation)
+        self.totalreward = self.totalreward + self.reward
         return observation, self.reward, self.done, info
 
     def reset(self):
@@ -428,6 +468,7 @@ class flyEnv(gym.Env):
             self.prev_rudder.append(-1) # to create history
         
         self.lastaction = None
+        self.totalreward = 0
         ######      
         #self.time_step = 1
         self.resettime = time.time()
@@ -477,12 +518,13 @@ class flyEnv(gym.Env):
         self.myloclon = float(0.0) 
         
         keyboard = Controller()
-        key = Key.f3
+        keys = [Key.f1,Key.f2, Key.f3]
+        key = random.choice(keys)
         keyboard.press(key)
         keyboard.release(key)
         observation = [self.t, self.yaw, self.pitch, self.roll, self.speedx, self.speedy, self.speedz, self.altBar, self.altRad,
                 self.egt, float(0), float(0), float(0), float(0), float(0), float(0), float(0), float(0), float(0), self.myloclat, self.myloclon,self.weight]
         observation = np.array(observation).astype(np.float32)
         #observation
-
+        time.sleep(2)
         return observation
