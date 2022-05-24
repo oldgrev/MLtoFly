@@ -40,10 +40,10 @@ if not os.path.exists(logdir):
 from stable_baselines3 import PPO
 from stable_baselines3.ppo import MlpPolicy
 #model = PPO('MlpPolicy', env, verbose=1, tensorboard_log=logdir)
-model = PPO('MlpPolicy', env=env, verbose=2, tensorboard_log=logdir)
+#model = PPO('MlpPolicy', env=env, verbose=2, tensorboard_log=logdir)
 
-#model = PPO.load("expert")
-TIMESTEPS = 2000
+model = PPO.load("2200",env=env,tensorboard_log=logdir)
+TIMESTEPS = 200
 EPISODES = 5
 iters = 0
 while True:

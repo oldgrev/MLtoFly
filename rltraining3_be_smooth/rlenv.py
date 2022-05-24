@@ -38,7 +38,10 @@ class flyEnv(gym.Env):
         register_hotkeys(bindings)
         self.success = False
         self.lastaction = None
+
+        self.done = False
         self.badmove = None
+        self.run = 0
         # Finally, start listening for keypresses
         start_checking_hotkeys()
         self.cycles = 0
@@ -240,10 +243,11 @@ class flyEnv(gym.Env):
         message = bytesAddressPair[0]
         logline = (message.decode() + "," + "{:f}".format(action[0]) + "," + "{:f}".format(action[1]) + "," + "{:f}".format(action[2]) + "," + "{:f}".format(action[3]) + "\n")
         self.telemetryfile.write(logline)
-        self.flushcounter =+ 1
-        if(self.flushcounter > 10):
-            self.telemetryfile.flush()
-            self.flushcounter = 0        
+        self.telemetryfile.flush()
+        #self.flushcounter =+ 1
+        #if(self.flushcounter > 10):
+        #    self.telemetryfile.flush()
+        #    self.flushcounter = 0        
         self.prev_actions.append(action)
         self.messagearray = message.decode().split(",")
         if(not self.lastmessagearray):
@@ -472,15 +476,58 @@ class flyEnv(gym.Env):
         self.totalreward = 0
         ######      
         #self.time_step = 1
+        print("Run:", self.run)
+        self.run += 1
         self.resettime = time.time()
         self.supercrash = False
-        print("resetting")
+        #print("resetting")
         self.reward = 0.0
         self.steps = 0
         reward = float(0.0)
         reward = float(self.reward)
-        bytesAddressPair = self.UDPServerSocket.recvfrom(self.bufferSize)
+        #bytesAddressPair = self.UDPServerSocket.recvfrom(self.bufferSize)
+        #message = bytesAddressPair[0]
+                
+        self.UDPServerSocket.setblocking(0)
+        start = time.time()
+        message = None
+        bytesAddressPair = None
+        while not bytesAddressPair:
+            end = time.time()
+            if(end - start > 1):
+                #print("Timeout")
+                needdata = False
+                #keyboard = Controller()
+                #key = Key.esc
+                #keyboard.press(key)
+                #keyboard.release(key)
+                #time.sleep(1)
+                mouse.move(969, 697, absolute=True, duration=0.2)
+                mouse.click('left')
+                #time.sleep(2)
+                mouse.move(1524, 931, absolute=True, duration=0.2)
+                mouse.click('left')
+                #time.sleep(10)
+                mouse.move(1514, 930, absolute=True, duration=0.2)
+                mouse.click('left')
+
+                #time.sleep(1)
+                #mouse.move(1793, 845, absolute=True, duration=0.2)
+                #mouse.click('left')
+                #time.sleep(2)
+                #mouse.move(2270, 1077, absolute=True, duration=0.2)
+                #mouse.click('left')
+                #time.sleep(10)
+                #mouse.move(2314, 1078, absolute=True, duration=0.2)
+                #mouse.click('left')
+            try:
+                bytesAddressPair = self.UDPServerSocket.recvfrom(self.bufferSize)
+            except:
+                pass
+        self.UDPServerSocket.setblocking(1)
+
         message = bytesAddressPair[0]
+
         self.messagearray = message.decode().split(",")            
         self.lastmessagearray = self.messagearray
         self.t = float(self.messagearray[0])
